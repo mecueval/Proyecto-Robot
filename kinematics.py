@@ -31,7 +31,7 @@ def dh_a_servos(q1, q2, q3):
     if not (LIMITES_SERVOS["base"]["min"] <= s_base <= LIMITES_SERVOS["base"]["max"]):
         raise ValueError(f"Servo Base fuera de rango: {s_base:.1f}°")
     if not (LIMITES_SERVOS["s0"]["min"] <= s0 <= LIMITES_SERVOS["s0"]["max"]):
-        raise ValueError(f"Servo 0 (Hombro) fuera de rango: {s0:.1f}° (permitido: 50°-90°)")
+        raise ValueError(f"Servo 0 (Hombro) fuera de rango: {s0:.1f}° (permitido: 50°-110°)")
     if not (LIMITES_SERVOS["s1"]["min"] <= s1 <= LIMITES_SERVOS["s1"]["max"]):
         raise ValueError(f"Servo 1 (Antebrazo) fuera de rango: {s1:.1f}° (permitido: 0°-20°)")
 
