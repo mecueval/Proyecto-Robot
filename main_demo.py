@@ -11,6 +11,7 @@ from kinematics import (
 )
 from hardware_controller import RobotController
 import numpy as np
+from config import LIMITES_SERVOS
 
 # Formato limpio para todas las matrices (evita "0.", "1." y notación científica)
 np.set_printoptions(
@@ -62,9 +63,13 @@ def modo_fk(robot):
     """Evalúa Cinemática Directa desde ángulos articulares de servo y mueve el robot."""
     print("\n[1. CINEMÁTICA DIRECTA (FK)]")
     try:
-        s_base = float(input(f"  Servo Base (30° a 150°) [{robot.angulos_actuales['base']:.1f}]: ") or robot.angulos_actuales["base"])
-        s0 = float(input("  Servo 0 Hombro (50° a 90°): "))
-        s1 = float(input("  Servo 1 Antebrazo (0° a 20°): "))
+        b_min, b_max = LIMITES_SERVOS["base"]["min"], LIMITES_SERVOS["base"]["max"]
+        s0_min, s0_max = LIMITES_SERVOS["s0"]["min"], LIMITES_SERVOS["s0"]["max"]
+        s1_min, s1_max = LIMITES_SERVOS["s1"]["min"], LIMITES_SERVOS["s1"]["max"]
+
+        s_base = float(input(f"  Servo Base ({b_min}° a {b_max}°) [{robot.angulos_actuales['base']:.1f}]: ") or robot.angulos_actuales["base"])
+        s0 = float(input(f"  Servo 0 Hombro ({s0_min}° a {s0_max}°) [{robot.angulos_actuales['s0']:.1f}]: ") or robot.angulos_actuales["s0"])
+        s1 = float(input(f"  Servo 1 Antebrazo ({s1_min}° a {s1_max}°) [{robot.angulos_actuales['s1']:.1f}]: ") or robot.angulos_actuales["s1"])
 
         robot._validar_limites(s_base, s0, s1)
 
@@ -114,9 +119,9 @@ def test_consistencia_matematica():
     """Verifica analíticamente que IK(FK(q)) == q y que J @ J^-1 == I."""
     print("\n[3. TEST DE CONSISTENCIA D-H (FK <-> IK) Y DIFERENCIAL (J @ J^-1 == I)]")
     casos_prueba = [
-        (90.0, 90.0, 20.0),  # Posición inicial
-        (90.0, 70.0, 10.0),  # Punto intermedio
-        (60.0, 55.0, 5.0),   # Base girada + brazo extendido
+        (97.5, 90.0, 90.0),   # Nueva posición inicial
+        (97.5, 70.0, 80.0),   # Brazo extendido hacia adelante
+        (67.5, 65.0, 100.0),  # Base girada + antebrazo más abajo
     ]
     for s_base, s0, s1 in casos_prueba:
         q1, q2, q3 = servos_a_dh(s_base, s0, s1)

@@ -1,3 +1,4 @@
+import math
 import time
 from config import LIMITES_SERVOS
 
@@ -44,48 +45,54 @@ class RobotController:
             ch = LIMITES_SERVOS[nombre]["canal"]
             self.kit.servo[ch].angle = self.angulos_actuales[nombre]
 
+    def _enviar_pwm(self, s_base, s0, s1):
+        """Paso elemental que aplica los 3 ángulos redondeados al PCA9685."""
+        self._aplicar_angulo("base", s_base)
+        self._aplicar_angulo("s0", s0)
+        self._aplicar_angulo("s1", s1)
+
     def ir_a_inicio(self, suave=True):
-        """Lleva todos los servos a su posición inicial calibrada (Base: 90°, s0: 90°, s1: 20°)."""
+        """Lleva todos los servos a su posición inicial calibrada (Base: 97.5°, s0: 90°, s1: 90°)."""
         s_base_ini = LIMITES_SERVOS["base"]["inicial"]
         s0_ini = LIMITES_SERVOS["s0"]["inicial"]
         s1_ini = LIMITES_SERVOS["s1"]["inicial"]
 
         if not suave or not self.angulos_actuales:
             self._validar_limites(s_base_ini, s0_ini, s1_ini)
-            self._aplicar_angulo("base", s_base_ini)
-            self._aplicar_angulo("s0", s0_ini)
-            self._aplicar_angulo("s1", s1_ini)
+            self._enviar_pwm(s_base_ini, s0_ini, s1_ini)
         else:
-            self.mover_servos(s_base_ini, s0_ini, s1_ini)
+            self.mover_servos(s_base_ini, s0_ini, s1_ini, suave=True)
 
-    def mover_servos(self, s_base, s0, s1, paso_deg=2.0, pausa=0.025):
-        """Mueve los 3 servos de forma interpolada y segura hasta los ángulos objetivo."""
+    def mover_servos(self, s_base, s0, s1, suave=True, pasos=40, pausa=0.025):
+        """Valida límites y mueve los 3 servos simultáneamente con perfil suave cosenoidal."""
         self._validar_limites(s_base, s0, s1)
 
-        destinos = {"base": float(s_base), "s0": float(s0), "s1": float(s1)}
-        inicios = self.angulos_actuales.copy()
+        if not suave or self.simular:
+            self._enviar_pwm(s_base, s0, s1)
+            return
 
-        # Calcula el número de pasos según la articulación que deba recorrer más grados
-        max_delta = max(abs(destinos[k] - inicios[k]) for k in destinos)
-        num_pasos = max(1, int(max_delta / paso_deg))
+        b_ini = self.angulos_actuales["base"]
+        s0_ini = self.angulos_actuales["s0"]
+        s1_ini = self.angulos_actuales["s1"]
 
-        for i in range(1, num_pasos + 1):
-            t = i / num_pasos
-            for nombre in destinos:
-                ang_intermedio = inicios[nombre] + t * (destinos[nombre] - inicios[nombre])
-                self._aplicar_angulo(nombre, ang_intermedio)
-            if not self.simular:
-                time.sleep(pausa)
+        if max(abs(s_base - b_ini), abs(s0 - s0_ini), abs(s1 - s1_ini)) < 1.0:
+            self._enviar_pwm(s_base, s0, s1)
+            return
+
+        for i in range(1, pasos + 1):
+            t = 0.5 * (1.0 - math.cos(math.pi * i / pasos))
+            b_act = b_ini + (s_base - b_ini) * t
+            s0_act = s0_ini + (s0 - s0_ini) * t
+            s1_act = s1_ini + (s1 - s1_ini) * t
+            self._enviar_pwm(b_act, s0_act, s1_act)
+            time.sleep(pausa)
 
     def ejecutar_trayectoria(self, secuencia_servos, pausa_paso=0.04):
         """Ejecuta una lista pre-validada de comandos (s_base, s0, s1) en secuencia."""
-        # Validación preventiva total
         for s_base, s0, s1 in secuencia_servos:
             self._validar_limites(s_base, s0, s1)
 
         for s_base, s0, s1 in secuencia_servos:
-            self._aplicar_angulo("base", s_base)
-            self._aplicar_angulo("s0", s0)
-            self._aplicar_angulo("s1", s1)
+            self._enviar_pwm(s_base, s0, s1)
             if not self.simular:
                 time.sleep(pausa_paso)

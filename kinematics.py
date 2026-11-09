@@ -14,29 +14,36 @@ def dh_matrix(theta_deg, d, a, alpha_deg):
 
 def servos_a_dh(s_base, s0, s1):
     """Convierte comandos físicos de servos a variables articulares D-H (q1, q2, q3)."""
+    s1_ini = LIMITES_SERVOS["s1"]["inicial"]  # Ahora es 90.0
     q1 = s_base - BASE_CENTRO
     q2 = s0 - DELTA_0
-    alpha_abs_2 = THETA_MESA_INICIAL + (20.0 - s1)
+    alpha_abs_2 = THETA_MESA_INICIAL + (s1_ini - s1)
     q3 = alpha_abs_2 - q2
     return q1, q2, q3
 
+
 def dh_a_servos(q1, q2, q3):
     """Convierte variables articulares D-H (q1, q2, q3) a comandos de servos y valida rangos."""
-    # Redondeamos primero para eliminar ruido numérico de punto flotante (ej. 90.00000000000001)
+    s1_ini = LIMITES_SERVOS["s1"]["inicial"]  # Ahora es 90.0
     s_base = round(float(q1 + BASE_CENTRO), 2)
     s0 = round(float(q2 + DELTA_0), 2)
-    s1 = round(float(THETA_MESA_INICIAL + 20.0 - (q2 + q3)), 2)
+    s1 = round(float(THETA_MESA_INICIAL + s1_ini - (q2 + q3)), 2)
 
-    # Validación contra límites físicos reales
     if not (LIMITES_SERVOS["base"]["min"] <= s_base <= LIMITES_SERVOS["base"]["max"]):
         raise ValueError(f"Servo Base fuera de rango: {s_base:.1f}°")
     if not (LIMITES_SERVOS["s0"]["min"] <= s0 <= LIMITES_SERVOS["s0"]["max"]):
-        raise ValueError(f"Servo 0 (Hombro) fuera de rango: {s0:.1f}° (permitido: 50°-110°)")
+        raise ValueError(
+            f"Servo 0 (Hombro) fuera de rango: {s0:.1f}° "
+            f"(permitido: {LIMITES_SERVOS['s0']['min']}°-{LIMITES_SERVOS['s0']['max']}°)"
+        )
     if not (LIMITES_SERVOS["s1"]["min"] <= s1 <= LIMITES_SERVOS["s1"]["max"]):
-        raise ValueError(f"Servo 1 (Antebrazo) fuera de rango: {s1:.1f}° (permitido: 0°-20°)")
+        raise ValueError(
+            f"Servo 1 (Antebrazo) fuera de rango: {s1:.1f}° "
+            f"(permitido: {LIMITES_SERVOS['s1']['min']}°-{LIMITES_SERVOS['s1']['max']}°)"
+        )
 
-    return round(s_base, 1), round(s0, 1), round(s1, 1)
-
+    return s_base, s0, s1
+    
 def forward_kinematics(q1, q2, q3):
     """Calcula la cadena de matrices D-H y retorna posiciones de articulaciones y efector final."""
     A1 = dh_matrix(q1, L0, 0.0, 90.0)
