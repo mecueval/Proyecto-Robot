@@ -11,7 +11,7 @@ from kinematics import (
     get_inverse_jacobian,
 )
 from hardware_controller import RobotController
-from config import LIMITES_SERVOS, Z_MIN_SEGURIDAD
+from config import LIMITES_SERVOS, Z_MIN_SEGURIDAD, PINZA_OFFSET_X
 
 # Formato limpio para todas las matrices (evita "0.", "1." y notación científica)
 np.set_printoptions(
@@ -174,24 +174,29 @@ def modo_pinza_manual(robot):
 
 
 def modo_pick_and_place(robot):
-    """Ejecuta una secuencia completa de recoger y dejar un objeto respetando Z >= 8.0 cm."""
-    print("\n[5. SECUENCIA AUTOMÁTICA PICK & PLACE]")
-    print(f"  (Recuerda: Z_agarre debe ser >= {Z_MIN_SEGURIDAD} cm para no tocar la mesa)")
+    """Ejecuta Pick & Place en el plano frontal (X, Z) compensando PINZA_OFFSET_X."""
+    _, pos_ini, _ = obtener_estado_actual(robot)
+    y_fijo = round(float(pos_ini[1]), 2)
+
+    print("\n[5. SECUENCIA AUTOMÁTICA PICK & PLACE (PLANO FRONTAL X-Z)]")
+    print(f"  Y bloqueado en posición inicial: Y = {y_fijo:.2f} cm (Base fija en {robot.angulos_actuales['base']:.1f}°)")
+    print(f"  Offset herramienta: Pinza sobresale +{PINZA_OFFSET_X} cm en X y -{Z_MIN_SEGURIDAD} cm en Z")
 
     try:
-        x_ini = float(input("  Origen X [18.0]: ") or 18.0)
-        y_ini = float(input("  Origen Y [-5.0]: ") or -5.0)
-        z_obj = float(input("  Altura Z de agarre [9.0]: ") or 9.0)
+        # Tú ingresas la posición real del objeto en la mesa (ej. recoger en 20 cm, dejar en 25 cm)
+        x_obj_ini = float(input("  Posición real del objeto X (recoger) [20.0]: ") or 20.0)
+        x_obj_fin = float(input("  Posición destino del objeto X (dejar) [25.0]: ") or 25.0)
+        z_muneca  = float(input("  Altura Z de muñeca para agarre [9.0]:    ") or 9.0)
 
-        x_fin = float(input("  Destino X [18.0]: ") or 18.0)
-        y_fin = float(input("  Destino Y [5.0]: ") or 5.0)
+        # Coordenadas reales a las que debe ir el extremo de L2 (muñeca)
+        x_l2_ini = x_obj_ini - PINZA_OFFSET_X
+        x_l2_fin = x_obj_fin - PINZA_OFFSET_X
+        z_seguro = max(z_muneca + 5.0, 14.5)
 
-        z_seguro = max(z_obj + 5.0, 14.0)  # Altura de tránsito despejada sobre la mesa
-
-        p_sobre_origen   = (x_ini, y_ini, z_seguro)
-        p_agarre_origen  = (x_ini, y_ini, z_obj)
-        p_sobre_destino  = (x_fin, y_fin, z_seguro)
-        p_soltar_destino = (x_fin, y_fin, z_obj)
+        p_sobre_origen   = (x_l2_ini, y_fijo, z_seguro)
+        p_agarre_origen  = (x_l2_ini, y_fijo, z_muneca)
+        p_sobre_destino  = (x_l2_fin, y_fijo, z_seguro)
+        p_soltar_destino = (x_l2_fin, y_fijo, z_muneca)
 
         def mover_lineal_desde_actual(p_dest):
             _, p_act, _ = obtener_estado_actual(robot)
@@ -201,7 +206,7 @@ def modo_pick_and_place(robot):
         print("\n-> [1/7] Abriendo pinza (40°)...")
         robot.abrir_pinza()
 
-        print(f"-> [2/7] Aproximación superior a origen {p_sobre_origen}...")
+        print(f"-> [2/7] Aproximación superior (Objeto X={x_obj_ini} -> L2 X={x_l2_ini})...")
         mover_lineal_desde_actual(p_sobre_origen)
 
         print(f"-> [3/7] Bajando verticalmente al objeto {p_agarre_origen}...")
@@ -211,7 +216,7 @@ def modo_pick_and_place(robot):
         robot.agarrar_objeto()
         time.sleep(0.3)
 
-        print(f"-> [5/7] Levantando y trasladando a destino {p_sobre_destino}...")
+        print(f"-> [5/7] Levantando y trasladando (Objeto X={x_obj_fin} -> L2 X={x_l2_fin})...")
         mover_lineal_desde_actual(p_sobre_origen)
         mover_lineal_desde_actual(p_sobre_destino)
 
@@ -227,7 +232,6 @@ def modo_pick_and_place(robot):
 
     except ValueError as e:
         print(f"\nSecuencia abortada por seguridad: {e}\n")
-
 
 def main():
     print("==========================================================")
