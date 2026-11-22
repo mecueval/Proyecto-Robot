@@ -2,6 +2,7 @@
 L0 = 9.5     # Altura mesa -> eje del hombro
 L1 = 14.5    # Hombro -> codo
 L2 = 16.0    # Codo -> punta
+A = 2.0      # Separación horizontal entre el eje de la base y el eje del hombro
 
 # Offsets de calibración en postura inicial (s0 = 90°, s1 = 20°)
 BASE_CENTRO = 97.5
