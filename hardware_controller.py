@@ -1,7 +1,6 @@
 import math
 import time
-from config import LIMITES_SERVOS
-
+from config import LIMITES_SERVOS, PINZA_ABIERTA, PINZA_AGARRE, PINZA_CERRADA
 try:
     from adafruit_servokit import ServoKit
     HARDWARE_DISPONIBLE = True
@@ -56,12 +55,15 @@ class RobotController:
         s_base_ini = LIMITES_SERVOS["base"]["inicial"]
         s0_ini = LIMITES_SERVOS["s0"]["inicial"]
         s1_ini = LIMITES_SERVOS["s1"]["inicial"]
+        pinza_ini = LIMITES_SERVOS["pinza"]["inicial"]
 
         if not suave or not self.angulos_actuales:
             self._validar_limites(s_base_ini, s0_ini, s1_ini)
             self._enviar_pwm(s_base_ini, s0_ini, s1_ini)
+            self._aplicar_angulo("pinza", pinza_ini)
         else:
             self.mover_servos(s_base_ini, s0_ini, s1_ini, suave=True)
+            self.mover_pinza(pinza_ini)
 
     def mover_servos(self, s_base, s0, s1, suave=True, pasos=40, pausa=0.025):
         """Valida límites y mueve los 3 servos simultáneamente con perfil suave cosenoidal."""
@@ -96,3 +98,32 @@ class RobotController:
             self._enviar_pwm(s_base, s0, s1)
             if not self.simular:
                 time.sleep(pausa_paso)
+
+    def mover_pinza(self, angulo_dest, pasos=20, pausa=0.02):
+        """Mueve la pinza suavemente verificando sus límites [40°, 90°]."""
+        min_p = LIMITES_SERVOS["pinza"]["min"]
+        max_p = LIMITES_SERVOS["pinza"]["max"]
+        if angulo_dest < min_p or angulo_dest > max_p:
+            raise ValueError(
+                f"SEGURIDAD: 'pinza' en {angulo_dest:.1f}° viola el rango [{min_p}°, {max_p}°]."
+            )
+
+        ang_ini = self.angulos_actuales.get("pinza", LIMITES_SERVOS["pinza"]["inicial"])
+        if self.simular or abs(angulo_dest - ang_ini) < 1.0:
+            self._aplicar_angulo("pinza", angulo_dest)
+            return
+
+        for i in range(1, pasos + 1):
+            t = 0.5 * (1.0 - math.cos(math.pi * i / pasos))
+            ang_act = ang_ini + (angulo_dest - ang_ini) * t
+            self._aplicar_angulo("pinza", ang_act)
+            time.sleep(pausa)
+
+    def abrir_pinza(self):
+        self.mover_pinza(PINZA_ABIERTA)
+
+    def agarrar_objeto(self):
+        self.mover_pinza(PINZA_AGARRE)
+
+    def cerrar_pinza(self):
+        self.mover_pinza(PINZA_CERRADA)

@@ -12,5 +12,11 @@ THETA_MESA_INICIAL = -25.94 # El brazo 2 baja 8.3 cm (de 21.0 a 12.7 cm) y avanz
 LIMITES_SERVOS = {
     "base": {"canal": 0, "min": 37.5, "max": 157.5, "inicial": 97.5}, 
     "s0":   {"canal": 1, "min": 50.0, "max": 110.0, "inicial": 90.0},
-    "s1":   {"canal": 2, "min": 50.0, "max": 120.0, "inicial": 90.0}
+    "s1":   {"canal": 2, "min": 50.0, "max": 120.0, "inicial": 90.0},
+    "pinza": {"canal": 3, "min": 40.0, "max": 90.0,  "inicial": 40.0},
 }
+
+PINZA_ABIERTA = 40.0
+PINZA_AGARRE  = 70.0
+PINZA_CERRADA = 88.0
+Z_MIN_SEGURIDAD = 8.0  # Altura mínima segura para evitar que la pinza (8 cm) golpee la mesa

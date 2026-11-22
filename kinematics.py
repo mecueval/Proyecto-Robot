@@ -1,5 +1,5 @@
 import numpy as np
-from config import L0, A, L1, L2, DELTA_0, THETA_MESA_INICIAL, BASE_CENTRO, LIMITES_SERVOS
+from config import L0, A, L1, L2, DELTA_0, THETA_MESA_INICIAL, BASE_CENTRO, LIMITES_SERVOS, Z_MIN_SEGURIDAD
 
 
 def dh_matrix(theta_deg, d, a, alpha_deg):
@@ -106,6 +106,10 @@ def inverse_kinematics(x, y, z, codo_arriba=True):
       4. Ángulo del hombro:
          q2 = atan2(z', r) - atan2(L2 * sin(q3), L1 + L2 * cos(q3))
     """
+    if z < Z_MIN_SEGURIDAD:
+        raise ValueError(
+            f"SEGURIDAD MESA: Z={z:.2f} cm es menor al límite mínimo ({Z_MIN_SEGURIDAD} cm por longitud de pinza)."
+        )
     # 1. Ángulo de la base
     q1_rad = np.arctan2(y, x)
 
