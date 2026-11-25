@@ -1,5 +1,5 @@
 import numpy as np
-from config import L0, A, L1, L2, DELTA_0, THETA_MESA_INICIAL, BASE_CENTRO, LIMITES_SERVOS, Z_MIN_SEGURIDAD
+from config import A, L0, L1, L2, DELTA_0, THETA_MESA_INICIAL, BASE_CENTRO, LIMITES_SERVOS, Z_MIN_SEGURIDAD, ESCALA_BASE
 
 
 def dh_matrix(theta_deg, d, a, alpha_deg):
@@ -17,7 +17,7 @@ def dh_matrix(theta_deg, d, a, alpha_deg):
 def servos_a_dh(s_base, s0, s1):
     """Convierte comandos físicos de servos a variables articulares D-H (q1, q2, q3)."""
     s1_ini = LIMITES_SERVOS["s1"]["inicial"]
-    q1 = s_base - BASE_CENTRO
+    q1 = (s_base - BASE_CENTRO) * ESCALA_BASE
     q2 = s0 - DELTA_0
     alpha_abs_2 = THETA_MESA_INICIAL + (s1_ini - s1)
     q3 = alpha_abs_2 - q2
@@ -27,7 +27,7 @@ def servos_a_dh(s_base, s0, s1):
 def dh_a_servos(q1, q2, q3):
     """Convierte variables articulares D-H (q1, q2, q3) a comandos de servos y valida rangos."""
     s1_ini = LIMITES_SERVOS["s1"]["inicial"]
-    s_base = round(float(q1 + BASE_CENTRO), 2)
+    s_base = round(float((q1 / ESCALA_BASE) + BASE_CENTRO), 2)
     s0 = round(float(q2 + DELTA_0), 2)
     s1 = round(float(THETA_MESA_INICIAL + s1_ini - (q2 + q3)), 2)
 

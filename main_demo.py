@@ -6,20 +6,9 @@ from kinematics import (
     forward_kinematics,
     inverse_kinematics,
     linear_trajectory,
-    get_jacobian,
-    get_singularities,
-    get_inverse_jacobian,
 )
 from hardware_controller import RobotController
 from config import LIMITES_SERVOS, Z_MIN_SEGURIDAD, PINZA_OFFSET_X
-
-# Formato limpio para todas las matrices (evita "0.", "1." y notación científica)
-np.set_printoptions(
-    precision=3,
-    suppress=True,
-    floatmode="fixed",
-    formatter={"float_kind": lambda x: f"{0.0 if abs(x) < 1e-9 else x:8.3f}"}
-)
 
 
 def obtener_estado_actual(robot):
@@ -27,8 +16,8 @@ def obtener_estado_actual(robot):
     s0 = robot.angulos_actuales["s0"]
     s1 = robot.angulos_actuales["s1"]
     q1, q2, q3 = servos_a_dh(s_base, s0, s1)
-    T03, puntos = forward_kinematics(q1, q2, q3)
-    return T03, puntos["efector"], (q1, q2, q3)
+    _, puntos = forward_kinematics(q1, q2, q3)
+    return puntos["efector"], (q1, q2, q3)
 
 
 def mostrar_estado_actual(robot):
@@ -36,32 +25,17 @@ def mostrar_estado_actual(robot):
     s0 = robot.angulos_actuales["s0"]
     s1 = robot.angulos_actuales["s1"]
     pinza = robot.angulos_actuales.get("pinza", LIMITES_SERVOS["pinza"]["inicial"])
-    T03, ef, (q1, q2, q3) = obtener_estado_actual(robot)
-
-    J = get_jacobian(q1, q2, q3)
-    es_sing, det_J = get_singularities(q2, q3)
+    ef, (q1, q2, q3) = obtener_estado_actual(robot)
 
     print("\n--- ESTADO ACTUAL DEL ROBOT ---")
     print(f"Servos físicos : Base = {s_base:.1f}° | s0 = {s0:.1f}° | s1 = {s1:.1f}° | Pinza = {pinza:.1f}°")
     print(f"Variables D-H  : q1 = {q1:.2f}°   | q2 = {q2:.2f}° | q3 = {q3:.2f}°")
     print(f"Posición (FK)  : X = {ef[0]:.2f} | Y = {ef[1]:.2f} | Z = {ef[2]:.2f} (Z_min = {Z_MIN_SEGURIDAD} cm)")
-    print("\nMatriz Homogénea T0^3:")
-    print(np.round(T03, 3))
-    print(f"\nDeterminante J : {det_J:.2f} | Singularidad: {'SÍ' if es_sing else 'NO'}")
-    print("Matriz Jacobiana J(q):")
-    print(np.round(J, 3))
-
-    if not es_sing:
-        J_inv = get_inverse_jacobian(q1, q2, q3)
-        print("Matriz Jacobiana Inversa J^-1(q):")
-        print(np.round(J_inv, 4))
-    else:
-        print("Matriz Jacobiana Inversa: No invertible (en singularidad).")
     print("-------------------------------\n")
 
 
 def modo_fk(robot):
-    """Evalúa Cinemática Directa desde ángulos articulares de servo y mueve el robot."""
+    """Evalúa Cinemática Directa desde ángulos de servo y mueve el robot."""
     print("\n[1. CINEMÁTICA DIRECTA (FK)]")
     try:
         b_min, b_max = LIMITES_SERVOS["base"]["min"], LIMITES_SERVOS["base"]["max"]
@@ -93,10 +67,10 @@ def modo_fk(robot):
 
 def modo_ik_lineal(robot):
     """Resuelve Cinemática Inversa interpolando una trayectoria lineal desde la posición actual."""
-    _, pos_actual, _ = obtener_estado_actual(robot)
+    pos_actual, _ = obtener_estado_actual(robot)
     print("\n[2. CINEMÁTICA INVERSA CON TRAYECTORIA LINEAL (IK)]")
     print(f"  Origen actual P0 = ({pos_actual[0]:.2f}, {pos_actual[1]:.2f}, {pos_actual[2]:.2f})")
-    print(f"  Nota: Z mínimo permitido = {Z_MIN_SEGURIDAD} cm (altura de la pinza)")
+    print(f"  Nota: Z mínimo permitido = {Z_MIN_SEGURIDAD} cm")
 
     try:
         x_fin = float(input("  Destino X: "))
@@ -108,9 +82,7 @@ def modo_ik_lineal(robot):
         print(f"\n-> Solución D-H destino : q1 = {q1_fin:.2f}°, q2 = {q2_fin:.2f}°, q3 = {q3_fin:.2f}°")
         print(f"-> Servos destino       : Base = {sb_fin}°, s0 = {s0_fin}°, s1 = {s1_fin}°")
 
-        secuencia, _ = linear_trajectory(
-            pos_actual, (x_fin, y_fin, z_fin), num_pasos=25
-        )
+        secuencia, _ = linear_trajectory(pos_actual, (x_fin, y_fin, z_fin), num_pasos=25)
         print(f"-> Trayectoria lineal validada ({len(secuencia)} puntos). Ejecutando...")
 
         robot.ejecutar_trayectoria(secuencia, pausa_paso=0.035)
@@ -120,38 +92,9 @@ def modo_ik_lineal(robot):
         print(f"Movimiento rechazado: {e}\n")
 
 
-def test_consistencia_matematica():
-    """Verifica analíticamente que IK(FK(q)) == q y que J @ J^-1 == I."""
-    print("\n[3. TEST DE CONSISTENCIA D-H (FK <-> IK) Y DIFERENCIAL (J @ J^-1 == I)]")
-    casos_prueba = [
-        (97.5, 90.0, 90.0),   # Posición inicial
-        (97.5, 70.0, 80.0),   # Brazo extendido hacia adelante
-        (67.5, 65.0, 100.0),  # Base girada + antebrazo más abajo
-    ]
-    for s_base, s0, s1 in casos_prueba:
-        q1, q2, q3 = servos_a_dh(s_base, s0, s1)
-        _, puntos = forward_kinematics(q1, q2, q3)
-        x, y, z = puntos["efector"]
-
-        q1_ik, q2_ik, q3_ik = inverse_kinematics(x, y, z)
-        sb_ik, s0_ik, s1_ik = dh_a_servos(q1_ik, q2_ik, q3_ik)
-        error_ang = max(abs(s_base - sb_ik), abs(s0 - s0_ik), abs(s1 - s1_ik))
-
-        J = get_jacobian(q1, q2, q3)
-        J_inv = get_inverse_jacobian(q1, q2, q3)
-        _, det_J = get_singularities(q2, q3)
-        error_jac = np.max(np.abs((J @ J_inv) - np.eye(3)))
-
-        print(
-            f"  Servos ({s_base}°, {s0}°, {s1}°) -> XYZ=({x:.2f}, {y:.2f}, {z:.2f}) "
-            f"| Error IK: {error_ang:.4f}° | det(J): {det_J:.1f} | Error J*J^-1: {error_jac:.6f}"
-        )
-    print()
-
-
 def modo_pinza_manual(robot):
     """Permite abrir, agarrar o cerrar la pinza manualmente."""
-    print("\n[4. CONTROL DE PINZA]")
+    print("\n[3. CONTROL DE PINZA]")
     print("  a -> Abrir (40°)")
     print("  g -> Agarrar objeto (70°)")
     print("  c -> Cerrar en vacío (88°)")
@@ -174,81 +117,107 @@ def modo_pinza_manual(robot):
 
 
 def modo_pick_and_place(robot):
-    """Ejecuta Pick & Place en el plano frontal (X, Z) compensando PINZA_OFFSET_X."""
-    _, pos_ini, _ = obtener_estado_actual(robot)
-    y_fijo = round(float(pos_ini[1]), 2)
+    """
+    Pick & Place en el plano (X, Y) a altura fija Z = Z_MIN_SEGURIDAD (15.5 cm),
+    compensando radialmente PINZA_OFFSET_X para que la punta de la pinza caiga
+    sobre las coordenadas reales del objeto.
+    """
+    Z_TRABAJO = Z_MIN_SEGURIDAD
+    DELTA_LEVANTE = 10.0  # 90° -> 80° al levantar el antebrazo
+    s1_min = LIMITES_SERVOS["s1"]["min"]
 
-    print("\n[5. SECUENCIA AUTOMÁTICA PICK & PLACE (PLANO FRONTAL X-Z)]")
-    print(f"  Y bloqueado en posición inicial: Y = {y_fijo:.2f} cm (Base fija en {robot.angulos_actuales['base']:.1f}°)")
-    print(f"  Offset herramienta: Pinza sobresale +{PINZA_OFFSET_X} cm en X y -{Z_MIN_SEGURIDAD} cm en Z")
+    def compensar_pinza(x_obj, y_obj):
+        r_obj = np.hypot(x_obj, y_obj)
+        if r_obj <= PINZA_OFFSET_X:
+            raise ValueError(
+                f"Objeto ({x_obj}, {y_obj}) demasiado cerca del origen "
+                f"(radio {r_obj:.2f} cm <= offset de pinza {PINZA_OFFSET_X} cm)."
+            )
+        escala = (r_obj - PINZA_OFFSET_X) / r_obj
+        return x_obj * escala, y_obj * escala
+
+    print("\n[4. SECUENCIA AUTOMÁTICA PICK & PLACE]")
+    print(f"  Altura fija: Z = {Z_TRABAJO:.1f} cm | Offset radial pinza: {PINZA_OFFSET_X:.1f} cm")
 
     try:
-        # Tú ingresas la posición real del objeto en la mesa (ej. recoger en 20 cm, dejar en 25 cm)
-        x_obj_ini = float(input("  Posición real del objeto X (recoger) [20.0]: ") or 20.0)
-        x_obj_fin = float(input("  Posición destino del objeto X (dejar) [25.0]: ") or 25.0)
-        z_muneca  = float(input("  Altura Z de muñeca para agarre [9.0]:    ") or 9.0)
+        x_obj_ini = float(input("  Objeto origen  X (recoger) [19.0]: ") or 19.0)
+        y_obj_ini = float(input("  Objeto origen  Y (recoger) [ 4.0]: ") or 4.0)
+        x_obj_fin = float(input("  Objeto destino X (dejar)   [19.0]: ") or 19.0)
+        y_obj_fin = float(input("  Objeto destino Y (dejar)   [-4.0]: ") or -4.0)
 
-        # Coordenadas reales a las que debe ir el extremo de L2 (muñeca)
-        x_l2_ini = x_obj_ini - PINZA_OFFSET_X
-        x_l2_fin = x_obj_fin - PINZA_OFFSET_X
-        z_seguro = max(z_muneca + 5.0, 14.5)
+        # 1. Compensar radialmente el largo de la pinza para obtener la posición de la muñeca (L2)
+        x_l2_ini, y_l2_ini = compensar_pinza(x_obj_ini, y_obj_ini)
+        x_l2_fin, y_l2_fin = compensar_pinza(x_obj_fin, y_obj_fin)
 
-        p_sobre_origen   = (x_l2_ini, y_fijo, z_seguro)
-        p_agarre_origen  = (x_l2_ini, y_fijo, z_muneca)
-        p_sobre_destino  = (x_l2_fin, y_fijo, z_seguro)
-        p_soltar_destino = (x_l2_fin, y_fijo, z_muneca)
+        # 2. Calcular IK exacta para origen y destino en Z = 15.5 cm
+        q_ini = inverse_kinematics(x_l2_ini, y_l2_ini, Z_TRABAJO, codo_arriba=True)
+        sb_ini, s0_ini, s1_ini = dh_a_servos(*q_ini)
 
-        def mover_lineal_desde_actual(p_dest):
-            _, p_act, _ = obtener_estado_actual(robot)
-            secuencia, _ = linear_trajectory(p_act, p_dest, num_pasos=20)
-            robot.ejecutar_trayectoria(secuencia, pausa_paso=0.035)
+        q_fin = inverse_kinematics(x_l2_fin, y_l2_fin, Z_TRABAJO, codo_arriba=True)
+        sb_fin, s0_fin, s1_fin = dh_a_servos(*q_fin)
 
-        print("\n-> [1/7] Abriendo pinza (40°)...")
+        # 3. Ángulos de levante del segundo brazo (s1 - 10°, respetando límite mínimo)
+        s1_lev_ini = max(s1_ini - DELTA_LEVANTE, s1_min)
+        s1_lev_fin = max(s1_fin - DELTA_LEVANTE, s1_min)
+
+        # 4. Validar todos los estados antes de mover el hardware
+        robot._validar_limites(sb_ini, s0_ini, s1_lev_ini)
+        robot._validar_limites(sb_ini, s0_ini, s1_ini)
+        robot._validar_limites(sb_fin, s0_fin, s1_lev_fin)
+        robot._validar_limites(sb_fin, s0_fin, s1_fin)
+
+        print(f"\n-> Origen  Obj({x_obj_ini:.1f}, {y_obj_ini:.1f}) -> L2({x_l2_ini:.2f}, {y_l2_ini:.2f}, {Z_TRABAJO}) | Base={sb_ini}°, s0={s0_ini}°, s1={s1_ini}° (levante: {s1_lev_ini}°)")
+        print(f"-> Destino Obj({x_obj_fin:.1f}, {y_obj_fin:.1f}) -> L2({x_l2_fin:.2f}, {y_l2_fin:.2f}, {Z_TRABAJO}) | Base={sb_fin}°, s0={s0_fin}°, s1={s1_fin}° (levante: {s1_lev_fin}°)")
+
+        # --- EJECUCIÓN DE LA SECUENCIA ---
+        print("\n-> [1/8] Abriendo pinza...")
         robot.abrir_pinza()
 
-        print(f"-> [2/7] Aproximación superior (Objeto X={x_obj_ini} -> L2 X={x_l2_ini})...")
-        mover_lineal_desde_actual(p_sobre_origen)
+        print("-> [2/8] Ubicando sobre el origen y bajando a la pieza...")
+        robot.mover_servos(sb_ini, s0_ini, s1_lev_ini, suave=True)
+        robot.mover_servos(sb_ini, s0_ini, s1_ini, suave=True)
 
-        print(f"-> [3/7] Bajando verticalmente al objeto {p_agarre_origen}...")
-        mover_lineal_desde_actual(p_agarre_origen)
-
-        print("-> [4/7] Cerrando pinza para agarrar (70°)...")
+        print("-> [3/8] Cerrando garra para sujetar la pieza...")
         robot.agarrar_objeto()
         time.sleep(0.3)
 
-        print(f"-> [5/7] Levantando y trasladando (Objeto X={x_obj_fin} -> L2 X={x_l2_fin})...")
-        mover_lineal_desde_actual(p_sobre_origen)
-        mover_lineal_desde_actual(p_sobre_destino)
+        print(f"-> [4/8] Levantando segundo brazo (s1 -> {s1_lev_ini:.1f}°)...")
+        robot.mover_servos(sb_ini, s0_ini, s1_lev_ini, suave=True)
 
-        print(f"-> [6/7] Bajando y soltando objeto {p_soltar_destino}...")
-        mover_lineal_desde_actual(p_soltar_destino)
+        print("-> [5/8] Trasladando pieza hacia el destino (brazo levantado)...")
+        robot.mover_servos(sb_fin, s0_fin, s1_lev_fin, suave=True)
+
+        print(f"-> [6/8] Bajando pieza al destino exacto (s1 -> {s1_fin:.1f}°)...")
+        robot.mover_servos(sb_fin, s0_fin, s1_fin, suave=True)
+
+        print("-> [7/8] Abriendo garra para soltar la pieza...")
         robot.abrir_pinza()
         time.sleep(0.3)
 
-        print("-> [7/7] Subiendo y regresando a posición inicial...")
-        mover_lineal_desde_actual(p_sobre_destino)
+        print(f"-> [8/8] Levantando segundo brazo (s1 -> {s1_lev_fin:.1f}°) y regresando a inicio...")
+        robot.mover_servos(sb_fin, s0_fin, s1_lev_fin, suave=True)
         robot.ir_a_inicio(suave=True)
         mostrar_estado_actual(robot)
 
     except ValueError as e:
         print(f"\nSecuencia abortada por seguridad: {e}\n")
 
+
 def main():
     print("==========================================================")
-    print("  VALIDACIÓN CINEMÁTICA D-H Y CONTROL DE SERVOS DEL ROBOT")
+    print("  CONTROL CINEMÁTICO D-H DEL MANIPULADOR 3-DOF (RRR)")
     print("==========================================================")
     robot = RobotController(simular=False)
     mostrar_estado_actual(robot)
 
     while True:
-        print("Menú de pruebas:")
-        print("  1. Cinemática Directa (Ángulos de servos -> XYZ y Jacobiana)")
-        print("  2. Cinemática Inversa (XYZ -> Trayectoria lineal)")
-        print("  3. Test de Consistencia Matemática (FK <-> IK y J @ J^-1)")
-        print("  4. Control Manual de Pinza (Abrir / Agarrar / Cerrar)")
-        print("  5. Secuencia Pick & Place (Recoger y trasladar objeto)")
-        print("  6. Regresar a Posición Inicial")
-        print("  7. Salir")
+        print("Menú:")
+        print("  1. Cinemática Directa (Ángulos de servos)")
+        print("  2. Cinemática Inversa (XYZ)")
+        print("  3. Control Manual de Pinza (Abrir / Agarrar / Cerrar)")
+        print("  4. Secuencia Pick & Place")
+        print("  5. Regresar a Posición Inicial")
+        print("  6. Salir")
 
         opcion = input("Opción > ").strip()
 
@@ -257,15 +226,13 @@ def main():
         elif opcion == "2":
             modo_ik_lineal(robot)
         elif opcion == "3":
-            test_consistencia_matematica()
-        elif opcion == "4":
             modo_pinza_manual(robot)
-        elif opcion == "5":
+        elif opcion == "4":
             modo_pick_and_place(robot)
-        elif opcion == "6":
+        elif opcion == "5":
             robot.ir_a_inicio(suave=True)
             mostrar_estado_actual(robot)
-        elif opcion == "7":
+        elif opcion == "6":
             print("Regresando a posición inicial antes de salir...")
             robot.ir_a_inicio(suave=True)
             break
