@@ -106,7 +106,7 @@ def inverse_kinematics(x, y, z, codo_arriba=True):
       4. Ángulo del hombro:
          q2 = atan2(z', r) - atan2(L2 * sin(q3), L1 + L2 * cos(q3))
     """
-    if z < Z_MIN_SEGURIDAD:
+    if z < Z_MIN_SEGURIDAD - 0.01:
         raise ValueError(
             f"SEGURIDAD MESA: Z={z:.2f} cm es menor al límite mínimo ({Z_MIN_SEGURIDAD} cm por longitud de pinza)."
         )

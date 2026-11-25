@@ -52,7 +52,7 @@ def modo_fk(robot):
         _, puntos = forward_kinematics(q1, q2, q3)
         ef = puntos["efector"]
 
-        if ef[2] < Z_MIN_SEGURIDAD:
+        if ef[2] < Z_MIN_SEGURIDAD - 0.01:
             raise ValueError(
                 f"SEGURIDAD MESA: Esta postura baja la muñeca a Z={ef[2]:.2f} cm (< {Z_MIN_SEGURIDAD} cm)."
             )

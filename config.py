@@ -1,12 +1,12 @@
 # Longitudes de eslabones medidas entre centros de giro (cm)
-L0 = 9.0     # Altura mesa -> eje del hombro
+L0 = 10.0     # Altura mesa -> eje del hombro
 L1 = 14.5    # Hombro -> codo
 L2 = 16.0    # Codo -> punta
-A = 1.5
+A = 1.0
 # Offsets de calibración en postura inicial (s0 = 90°, s1 = 20°)
 BASE_CENTRO = 102
 DELTA_0 = 0              # El brazo 1 está a 99.52° (retrocede 2.40 cm en X y sube 14.3 cm en Z)
-THETA_MESA_INICIAL = -30 # El brazo 2 baja 8.3 cm (de 21.0 a 12.7 cm) y avanza 13.68 cm en X
+THETA_MESA_INICIAL = -32.09 # El brazo 2 baja 8.3 cm (de 21.0 a 12.7 cm) y avanza 13.68 cm en X
 ESCALA_BASE = 0.75  # Grados físicos reales por cada grado comandado en la base
 
 LIMITES_SERVOS = {
@@ -19,5 +19,5 @@ LIMITES_SERVOS = {
 PINZA_ABIERTA = 40.0
 PINZA_AGARRE  = 70.0
 PINZA_CERRADA = 88.0
-Z_MIN_SEGURIDAD = 15.5  # Altura mínima segura para evitar que la pinza (8 cm) golpee la mesa
+Z_MIN_SEGURIDAD = 16.0 # Altura mínima segura para evitar que la pinza (8 cm) golpee la mesa
 PINZA_OFFSET_X = 5.0
