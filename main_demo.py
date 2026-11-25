@@ -123,7 +123,7 @@ def modo_pick_and_place(robot):
     sobre las coordenadas reales del objeto.
     """
     Z_TRABAJO = Z_MIN_SEGURIDAD
-    DELTA_LEVANTE = 10.0  # 90° -> 80° al levantar el antebrazo
+    DELTA_LEVANTE = 25.0  # 90° -> 80° al levantar el antebrazo
     s1_min = LIMITES_SERVOS["s1"]["min"]
 
     def compensar_pinza(x_obj, y_obj):

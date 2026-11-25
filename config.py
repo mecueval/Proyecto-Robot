@@ -17,7 +17,7 @@ LIMITES_SERVOS = {
 }
 
 PINZA_ABIERTA = 40.0
-PINZA_AGARRE  = 70.0
+PINZA_AGARRE  = 75.0
 PINZA_CERRADA = 88.0
 Z_MIN_SEGURIDAD = 16.0 # Altura mínima segura para evitar que la pinza (8 cm) golpee la mesa
-PINZA_OFFSET_X = 5.0
+PINZA_OFFSET_X = 4.6
