@@ -115,15 +115,18 @@ def modo_pinza_manual(robot):
     except ValueError as e:
         print(f"Error: {e}\n")
 
-
 def modo_pick_and_place(robot):
     """
-    Pick & Place en el plano (X, Y) a altura fija Z = Z_MIN_SEGURIDAD (15.5 cm),
-    compensando radialmente PINZA_OFFSET_X para que la punta de la pinza caiga
-    sobre las coordenadas reales del objeto.
+    Pick & Place con coordenadas fijas:
+    - Recogida: (20.0,  8.0) cm
+    - Destino : (22.0, -8.0) cm
+    A altura fija Z = Z_MIN_SEGURIDAD (15.5 cm), compensando radialmente PINZA_OFFSET_X.
     """
+    X_OBJ_INI, Y_OBJ_INI = 20.0, 8.0
+    X_OBJ_FIN, Y_OBJ_FIN = 22.0, -8.0
+
     Z_TRABAJO = Z_MIN_SEGURIDAD
-    DELTA_LEVANTE = 25.0  # 90° -> 80° al levantar el antebrazo
+    DELTA_LEVANTE = 25.0  # Sube el antebrazo 25° al levantar/trasladar
     s1_min = LIMITES_SERVOS["s1"]["min"]
 
     def compensar_pinza(x_obj, y_obj):
@@ -137,17 +140,13 @@ def modo_pick_and_place(robot):
         return x_obj * escala, y_obj * escala
 
     print("\n[4. SECUENCIA AUTOMÁTICA PICK & PLACE]")
+    print(f"  Recogida: ({X_OBJ_INI}, {Y_OBJ_INI}) cm -> Destino: ({X_OBJ_FIN}, {Y_OBJ_FIN}) cm")
     print(f"  Altura fija: Z = {Z_TRABAJO:.1f} cm | Offset radial pinza: {PINZA_OFFSET_X:.1f} cm")
 
     try:
-        x_obj_ini = float(input("  Objeto origen  X (recoger) [19.0]: ") or 19.0)
-        y_obj_ini = float(input("  Objeto origen  Y (recoger) [ 4.0]: ") or 4.0)
-        x_obj_fin = float(input("  Objeto destino X (dejar)   [19.0]: ") or 19.0)
-        y_obj_fin = float(input("  Objeto destino Y (dejar)   [-4.0]: ") or -4.0)
-
         # 1. Compensar radialmente el largo de la pinza para obtener la posición de la muñeca (L2)
-        x_l2_ini, y_l2_ini = compensar_pinza(x_obj_ini, y_obj_ini)
-        x_l2_fin, y_l2_fin = compensar_pinza(x_obj_fin, y_obj_fin)
+        x_l2_ini, y_l2_ini = compensar_pinza(X_OBJ_INI, Y_OBJ_INI)
+        x_l2_fin, y_l2_fin = compensar_pinza(X_OBJ_FIN, Y_OBJ_FIN)
 
         # 2. Calcular IK exacta para origen y destino en Z = 15.5 cm
         q_ini = inverse_kinematics(x_l2_ini, y_l2_ini, Z_TRABAJO, codo_arriba=True)
@@ -156,7 +155,7 @@ def modo_pick_and_place(robot):
         q_fin = inverse_kinematics(x_l2_fin, y_l2_fin, Z_TRABAJO, codo_arriba=True)
         sb_fin, s0_fin, s1_fin = dh_a_servos(*q_fin)
 
-        # 3. Ángulos de levante del segundo brazo (s1 - 10°, respetando límite mínimo)
+        # 3. Ángulos de levante del segundo brazo (s1 - 25°, respetando límite mínimo)
         s1_lev_ini = max(s1_ini - DELTA_LEVANTE, s1_min)
         s1_lev_fin = max(s1_fin - DELTA_LEVANTE, s1_min)
 
@@ -166,8 +165,8 @@ def modo_pick_and_place(robot):
         robot._validar_limites(sb_fin, s0_fin, s1_lev_fin)
         robot._validar_limites(sb_fin, s0_fin, s1_fin)
 
-        print(f"\n-> Origen  Obj({x_obj_ini:.1f}, {y_obj_ini:.1f}) -> L2({x_l2_ini:.2f}, {y_l2_ini:.2f}, {Z_TRABAJO}) | Base={sb_ini}°, s0={s0_ini}°, s1={s1_ini}° (levante: {s1_lev_ini}°)")
-        print(f"-> Destino Obj({x_obj_fin:.1f}, {y_obj_fin:.1f}) -> L2({x_l2_fin:.2f}, {y_l2_fin:.2f}, {Z_TRABAJO}) | Base={sb_fin}°, s0={s0_fin}°, s1={s1_fin}° (levante: {s1_lev_fin}°)")
+        print(f"\n-> Origen  Obj({X_OBJ_INI:.1f}, {Y_OBJ_INI:.1f}) -> L2({x_l2_ini:.2f}, {y_l2_ini:.2f}, {Z_TRABAJO}) | Base={sb_ini}°, s0={s0_ini}°, s1={s1_ini}° (levante: {s1_lev_ini}°)")
+        print(f"-> Destino Obj({X_OBJ_FIN:.1f}, {Y_OBJ_FIN:.1f}) -> L2({x_l2_fin:.2f}, {y_l2_fin:.2f}, {Z_TRABAJO}) | Base={sb_fin}°, s0={s0_fin}°, s1={s1_fin}° (levante: {s1_lev_fin}°)")
 
         # --- EJECUCIÓN DE LA SECUENCIA ---
         print("\n-> [1/8] Abriendo pinza...")
@@ -201,7 +200,6 @@ def modo_pick_and_place(robot):
 
     except ValueError as e:
         print(f"\nSecuencia abortada por seguridad: {e}\n")
-
 
 def main():
     print("==========================================================")

@@ -7,7 +7,9 @@ A = 1.0
 BASE_CENTRO = 102
 DELTA_0 = 0              # El brazo 1 está a 99.52° (retrocede 2.40 cm en X y sube 14.3 cm en Z)
 THETA_MESA_INICIAL = -32.09 # El brazo 2 baja 8.3 cm (de 21.0 a 12.7 cm) y avanza 13.68 cm en X
-ESCALA_BASE = 0.75  # Grados físicos reales por cada grado comandado en la base
+ESCALA_BASE_FK = 1.0   # Cinemática directa (1.0 = sin escala / 1:1)
+ESCALA_BASE_IK = 0.75  # Cinemática inversa
+ESCALA_BASE = ESCALA_BASE_IK  # Respaldo por si algún otro archivo aún importa este nombre
 
 LIMITES_SERVOS = {
     "base": {"canal": 0, "min": 42, "max": 162, "inicial": 102}, 
