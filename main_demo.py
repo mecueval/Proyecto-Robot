@@ -8,7 +8,7 @@ from kinematics import (
     linear_trajectory,
 )
 from hardware_controller import RobotController
-from config import LIMITES_SERVOS, Z_MIN_SEGURIDAD, PINZA_OFFSET_X
+from config import LIMITES_SERVOS, Z_MIN_SEGURIDAD, PINZA_OFFSET_X, R_MIN_SEGURIDAD, R_MAX_SEGURIDAD
 
 
 def obtener_estado_actual(robot):
@@ -33,7 +33,6 @@ def mostrar_estado_actual(robot):
     print(f"Posición (FK)  : X = {ef[0]:.2f} | Y = {ef[1]:.2f} | Z = {ef[2]:.2f} (Z_min = {Z_MIN_SEGURIDAD} cm)")
     print("-------------------------------\n")
 
-
 def modo_fk(robot):
     """Evalúa Cinemática Directa desde ángulos de servo y mueve el robot."""
     print("\n[1. CINEMÁTICA DIRECTA (FK)]")
@@ -57,13 +56,19 @@ def modo_fk(robot):
                 f"SEGURIDAD MESA: Esta postura baja la muñeca a Z={ef[2]:.2f} cm (< {Z_MIN_SEGURIDAD} cm)."
             )
 
+        r_ef = np.hypot(ef[0], ef[1])
+        if not (R_MIN_SEGURIDAD <= r_ef <= R_MAX_SEGURIDAD):
+            raise ValueError(
+                f"SEGURIDAD TORQUE: Esta postura estira el brazo a R={r_ef:.2f} cm "
+                f"(permitido: {R_MIN_SEGURIDAD}–{R_MAX_SEGURIDAD} cm)."
+            )
+
         print(f"\n-> Predicción D-H: X = {ef[0]:.2f}, Y = {ef[1]:.2f}, Z = {ef[2]:.2f}")
-        robot.mover_servos(s_base, s0, s1)
+        robot.mover_servos(s_base, s0, s1, suave=True)
         mostrar_estado_actual(robot)
 
     except ValueError as e:
         print(f"Error: {e}\n")
-
 
 def modo_ik_lineal(robot):
     """Resuelve Cinemática Inversa interpolando una trayectoria lineal desde la posición actual."""
